@@ -6,7 +6,8 @@
 *.dylib
 *.idea
 *.env
-
+*.aws-sam
+*.toml
 # Test binary, built with `go test -c`
 *.test
 

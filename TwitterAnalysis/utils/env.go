@@ -10,10 +10,10 @@ const (
 	AwsSecretAccessKey    = "AWS_SECRET_ACCESS_KEY"
 	AwsRegion             = "AWS_REGION"
 	AwsSessionToken       = "AWS_SESSION_TOKEN"
-	TwitterConsumerKey    = "TWWITTER_CONSUMER_KEY"
-	TwitterConsumerSecret = "TWWITTER_CONSUMER_SECRET"
-	TwitterAccessToken    = "TWWITTER_ACCESS_TOKEN"
-	TwitterAccessSecret   = "TWWITTER_ACCESS_SECRET"
+	TwitterConsumerKey    = "TWITTER_CONSUMER_KEY"
+	TwitterConsumerSecret = "TWITTER_CONSUMER_SECRET"
+	TwitterAccessToken    = "TWITTER_ACCESS_TOKEN"
+	TwitterAccessSecret   = "TWITTER_ACCESS_SECRET"
 	errMsg                = "get environment faile '%s' \n"
 )
 

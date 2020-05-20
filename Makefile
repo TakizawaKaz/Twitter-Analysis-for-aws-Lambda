@@ -4,7 +4,7 @@ deps:
 	go get -u ./...
 
 clean: 
-	rm -rf ./hello-world/hello-world
+	rm -rf ./TwitterAnalysis/TwitterAnalysis
 	
 build:
-	GOOS=linux GOARCH=amd64 go build -o TwitterAnalysis/TwitterAnalysis ./TwitterAnalysis
+	GOOS=linux GOARCH=amd64 go build -o ./TwitterAnalysis/TwitterAnalysis ./TwitterAnalysis
