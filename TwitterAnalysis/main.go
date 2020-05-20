@@ -1,107 +1,93 @@
 package main
 
 import (
+	"TwitterAnalysis/analysis"
+	"TwitterAnalysis/twitter"
+	"TwitterAnalysis/utils"
 	"context"
-	"fmt"
+	"encoding/json"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/dghubble/go-twitter/twitter"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/comprehend"
 	"github.com/dghubble/oauth1"
-	"net/http"
-	"time"
+	"strings"
 )
 
-type TweetResult struct {
-	Id         string
-	ScreenName string
-	Name       string
-	CreatedAt  time.Time
-	text       string
-	Positive   float64
-	Negative   float64
-	Mixid      float64
-	Natural    float64
-}
-
-const (
-	TwitterTimeLayout = "Mon Jan 2 15:04:05 -0700 2006"
-)
 var (
-	e Environment
-	jst = time.FixedZone("Asia/Tokyo", 9*60*60)
+	e utils.Environment
 )
 
-func init() {
+type ResponseJson struct {
+	Tweet       *[]twitter.TweetResult      `json:"tweet"`
+	Sentimental *[]analysis.SentimentalData `json:"sentimental"`
+}
+
+func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) ([]byte, error) {
+
+	//環境変数を取得
 	err := e.GetAccessKeys()
-	ErrorCheck(err)
-}
+	if err != nil {
+		return nil, err
+	}
 
-func main() {
-	lambda.Start(HandleRequest)
-}
-
-func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (response []byte, err error) {
-
+	//ツイッター検索ワードが設定されているかを判定
 	q := event.QueryStringParameters
-
 	var twQuery string
 	if val, ok := q["twquery"]; ok {
 		twQuery = val
 	} else {
-		return nil, ErrorRaise("Error Non Query parameter [twquery]")
+		return nil, utils.ErrorRaise("Error Non Query parameter [twquery]")
 	}
 
+	//TwitterAPI oauth1 での認証
 	config := oauth1.NewConfig(e.TwitterConsumerKey, e.TwitterConsumerSecret)
 	token := oauth1.NewToken(e.TwitterAccessToken, e.TwitterAccessSecret)
 	httpClient := config.Client(oauth1.NoContext, token)
 
-	err = SearchTweet(httpClient, twQuery)
-	ErrorCheck(err)
-
-	return nil, err
-
-}
-func SearchTweet(httpClient *http.Client, query string) error {
-
-	// Twitter client
-	client := twitter.NewClient(httpClient)
-
-	//検索パラメーターをセット
-	twitterParam := twitter.SearchTweetParams{
-		Query:      fmt.Sprintf("%s -filter:retweets", query),
-		Lang:       "ja",
-		Locale:     "ja",
-		ResultType: "recent",
-	}
-
-	//APIの結果
-	search, resp, err := client.Search.Tweets(&twitterParam)
+	//ツイートサーチ
+	twData, err := twitter.SearchTweet(httpClient, twQuery)
 	if err != nil {
-		return err
-	}
-	if resp.StatusCode != 200 {
-		return ErrorRaise(fmt.Sprintf("HTTP Statas code :%v \n", resp.Status))
+		return nil, err
 	}
 
-	twr := make([]TweetResult,0,len(search.Statuses))
-	for _, tweet := range search.Statuses {
+	//AWSセッション、認証情報をセット
+	sess := session.Must(session.NewSession())
+	cred := credentials.NewStaticCredentials(
+		e.AwsAccessKeyId, e.AwsSecretAccessKey, e.AwsSessionToken)
 
-		crAt, _ := time.Parse(TwitterTimeLayout, tweet.CreatedAt)
-		t := TweetResult{
-			Id:         tweet.User.IDStr,
-			ScreenName: tweet.User.ScreenName,
-			Name:       tweet.User.Name,
-			CreatedAt:  crAt.In(jst),
-			text:       tweet.Text,
-			Positive:   0,
-			Negative:   0,
-			Mixid:      0,
-			Natural:    0,
+	// Amazon Comprehend client の設定
+	svc := comprehend.New(
+		sess,
+		aws.NewConfig().WithRegion(e.AwsRegion).WithCredentials(cred),
+	)
+
+	//センチメンタル分析用のクライアント設定
+	textOnly := func() (text []string) {
+		for _, tw := range twData {
+			text = append(text, strings.Replace(tw.Text, "\n", "", -1))
 		}
-
-		fmt.Println(t)
-		twr = append(twr, t)
+		return text
+	}()
+	client := analysis.NewAnalysis(svc, textOnly)
+	//センチメンタル分析
+	analysisData, err := client.SentimentalAnalysis()
+	if err != nil {
+		return nil, err
 	}
 
-	return nil //Tweetオブジェクトを返す
+	//レスポンス用データの定義
+	respJson := ResponseJson{
+		Tweet:       &twData,
+		Sentimental: &analysisData,
+	}
+
+	//jsonで返答
+	return json.Marshal(respJson)
+}
+
+func main() {
+	lambda.Start(HandleRequest)
 }
