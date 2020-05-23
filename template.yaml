@@ -25,7 +25,7 @@ Resources:
       Environment:
         Variables:
           TWITTER_CONSUMER_KEY: [TWITTER_CONSUMER_KEY]
-          TWITTER_CONSUMER_SECRET: [TWITTER_CONSUMER_KEY]
+          TWITTER_CONSUMER_SECRET: [TWITTER_CONSUMER_SECRET]
           TWITTER_ACCESS_TOKEN: [TWITTER_ACCESS_TOKEN]
           TWITTER_ACCESS_SECRET: [TWITTER_ACCESS_SECRET]
   TwitterAnalysisFunctionIamRole:
@@ -39,13 +39,27 @@ Resources:
             Principal:
               Service: lambda.amazonaws.com
       Policies:
-        - PolicyName: "comprehend-detectSentiment-policy"
+        - PolicyName: "twitter-analysis-policy"
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
                   - comprehend:DetectSentiment
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - xray:PutTraceSegments
+                  - xray:PutTelemetryRecords
+                  - xray:GetSamplingRules
+                  - xray:GetSamplingTargets
+                  - xray:GetSamplingStatisticSummaries
                 Resource: "*"
 Outputs:
   TwitterAnalysisAPI:
